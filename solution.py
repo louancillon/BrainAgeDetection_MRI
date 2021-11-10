@@ -52,7 +52,7 @@ def outliers_IF(x_train,y):
 
     return x_train, y
 
-def OutlierDetectionEuclideanMetric(data, ydata):
+def outliers_KNN(data, ydata):
     neigh = NearestNeighbors(n_neighbors=15)
     neigh.fit(data)
 
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     x_train, x_test = miss_val(x_train, x_test)
     #Remove outliers : Isolation Forest
     x_train, y = outliers_IF(x_train, y)
-    #x_train, y = OutlierDetectionEuclideanMetric(x_train, y)
+    #x_train, y = outliers_KNN(x_train, y)
 
     #Feature Selection :
         ####SelectKBest

@@ -1,29 +1,20 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+#import seaborn as sns
 
 from sklearn.ensemble import IsolationForest, VotingRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import NearestNeighbors
 
-from sklearn.feature_selection import RFE, SelectKBest, f_regression
+from sklearn.feature_selection import f_regression, chi2
 
 from sklearn.ensemble import RandomForestRegressor,  GradientBoostingRegressor
 from sklearn.metrics import r2_score
 
+import feature_selection as s
+
 SEED = 400
-
-
-#Recursive Feature Elimination
-def RFE_selector(X_train,X_test,y,num_features):
-    estimator = GradientBoostingRegressor(n_estimators=200, learning_rate=0.1, max_depth=4, min_samples_leaf=15, min_samples_split=10,random_state=SEED)
-    rfe_selector = RFE(estimator=estimator, n_features_to_select=num_features, step=0.1, verbose=1)
-    x_train_rfe = rfe_selector.fit_transform(X_train, y)
-    x_test_rfe = rfe_selector.transform(X_test)
-    rfe_support = rfe_selector.get_support()
-    rfe_feature = x_train.loc[:,rfe_support].columns.tolist()
-    return rfe_support, rfe_feature, pd.DataFrame(x_train_rfe),pd.DataFrame(x_test_rfe)
 
 
 #Filling missing values
@@ -96,14 +87,13 @@ if __name__ == '__main__':
     #x_train, y = outliers_KNN(x_train, y)
 
     #Feature Selection :
-        ####SelectKBest
-    #featureSelection = SelectKBest(f_regression, k=100)
-    #X_train = featureSelection.fit_transform(x_train, y)
-    #scores = featureSelection.scores_
-    #print("Shape after feature selection: ", X_train.shape)
-        ####RFESelector
-    rfe_support,_,x_train,x_test = RFE_selector(x_train,x_test,y,100)
-    print ("Train shape after RFESelector: {} ".format(x_train.shape))
+        # removing all features with variance lower than 0.1 (low var = all samples have the same values)
+    x_train, x_test = s.remove_low_var_features(x_train, x_test, 0.1)
+        # example : k_best with 20 best features using f_regression function
+    x_train, x_test = s.select_univariate(x_train, x_test, y, mode='k_best', param=20)
+        # example : using the lasso model for selection
+    x_train, x_test = s.select_from_model(x_train, x_test, y)
+    print ("Train shape after selection: {} ".format(x_train.shape))
 
 
     #Split the dataset

@@ -1,6 +1,7 @@
 import pandas as pd
+from sklearn.ensemble import GradientBoostingRegressor
 
-from sklearn.feature_selection import VarianceThreshold, GenericUnivariateSelect, SelectFromModel
+from sklearn.feature_selection import VarianceThreshold, GenericUnivariateSelect, SelectFromModel, RFE
 from sklearn.feature_selection import f_regression
 from sklearn.svm import SVR
 from sklearn.linear_model import Lasso, Ridge, ElasticNet
@@ -63,7 +64,7 @@ def select_univariate(X_train, X_test, y, score_func=f_regression, mode='percent
     return transform_data(X_train, X_test, sel, y=y)
 
 
-def select_from_model(X_train, X_test, y, model='lasso'):
+def select_from_model(X_train, X_test, y, model='Lasso'):
     """Selects the best features based on univariate statistical tests.
 
     Parameters
@@ -93,21 +94,8 @@ def select_from_model(X_train, X_test, y, model='lasso'):
     return pd.DataFrame(sel.transform(X_train)), pd.DataFrame(sel.transform(X_test))
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-"""
 def recursive_feature_elimination(X_train, X_test, y, num_features, estimator):
-    
+    ''''
     
     Parameters
     ----------
@@ -119,21 +107,20 @@ def recursive_feature_elimination(X_train, X_test, y, num_features, estimator):
         Lasso()
         Ridge()
         ElasticNet()
-    
-    estimator = estimator.fit(X_train, y)
-    sel = RFE(estimator, n_features_to_select=num_features, step=1)
-    return transform_data(X_train, X_test, sel, y)
-"""
+    '''
+    sel = RFE(estimator, n_features_to_select=num_features, step=0.1)
+    x_train = sel.fit_transform(X_train, y)
+    x_test = sel.transform(X_test)
+    return pd.DataFrame(x_train),pd.DataFrame(x_test)
 
 
-"""
+
 #Recursive Feature Elimination
 def RFE_selector(X_train,X_test,y,num_features):
-    estimator = GradientBoostingRegressor(n_estimators=200, learning_rate=0.1, max_depth=4, min_samples_leaf=15, min_samples_split=10,random_state=SEED)
+    estimator = GradientBoostingRegressor()
     rfe_selector = RFE(estimator=estimator, n_features_to_select=num_features, step=0.1, verbose=1)
     x_train_rfe = rfe_selector.fit_transform(X_train, y)
     x_test_rfe = rfe_selector.transform(X_test)
-    rfe_support = rfe_selector.get_support()
-    rfe_feature = x_train.loc[:,rfe_support].columns.tolist()
-    return rfe_support, rfe_feature, pd.DataFrame(x_train_rfe),pd.DataFrame(x_test_rfe)
-"""
+
+    return pd.DataFrame(x_train_rfe),pd.DataFrame(x_test_rfe)
+

@@ -1,10 +1,12 @@
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 
 from sklearn.feature_selection import VarianceThreshold, GenericUnivariateSelect, SelectFromModel, RFE
 from sklearn.feature_selection import f_regression
 from sklearn.svm import SVR
 from sklearn.linear_model import Lasso, Ridge, ElasticNet
+from sklearn.tree import DecisionTreeRegressor
+from catboost import CatBoostRegressor
 
 # More details on https://scikit-learn.org/stable/modules/feature_selection.html
 

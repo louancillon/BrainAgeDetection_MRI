@@ -1,7 +1,9 @@
+import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 #import seaborn as sns
+from sklearn import linear_model
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.neighbors import DistanceMetric
 from sklearn.ensemble import IsolationForest, VotingRegressor, AdaBoostRegressor
@@ -18,9 +20,12 @@ from sklearn.linear_model import SGDRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import ElasticNet
 from sklearn.linear_model import BayesianRidge
+from impyute.imputation.cs import mice, fast_knn
 from sklearn.impute import KNNImputer
+
 from sklearn.experimental import enable_iterative_imputer  # noqa
 from sklearn.impute import IterativeImputer
+
 
 from fancyimpute import KNN, NuclearNormMinimization, SoftImpute, BiScaler, IterativeImputer
 from sklearn.model_selection import GridSearchCV
@@ -55,6 +60,31 @@ def miss_val_with_knn(x_train,x_test):
     x_test = pd.DataFrame(impute_knn_test.fit_transform(x_test),columns = x_test.columns)
     return x_train,x_test
 
+def miss_val_with_fastknn(x_train,x_test):
+    x_train = pd.DataFrame(fast_knn(x_train.values, k=5))
+
+    x_test = pd.DataFrame(fast_knn(x_test.values, k=5))
+    return x_train,x_test
+
+def miss_val_with_mice(x_train,x_test):
+    x_train = pd.DataFrame(mice(x_train.values))
+
+    x_test = pd.DataFrame(mice(x_test.values))
+    return x_train,x_test
+
+
+
+
+
+'''
+def miss_val_with_missForest(x_train,x_test):
+    impute_MF = MissForest(max_iter=1, n_estimators=50)
+    x_train = pd.DataFrame(impute_MF.fit_transform(x_train),columns = x_train.columns)
+
+    impute_MF = MissForest()
+    x_test = pd.DataFrame(impute_MF.fit_transform(x_test),columns = x_train.columns)
+    return x_train,x_test
+'''
 def miss_val_with_fancyinput(x_train,x_test):
     print(x_train)
     X_train_incomplete_normalized = x_train
@@ -155,7 +185,7 @@ def run_model(x_train, y, x_Test, seed):
     #Split the dataset
     x_train, x_test, y_train, y_test = train_test_split(x_train, y, test_size=0.20, random_state=SEED)
 
-    catboost = CatBoostRegressor(random_seed=200, depth=6, learning_rate=0.05, iterations=1000)
+    catboost = CatBoostRegressor(random_seed=200, depth=6, learning_rate=0.05, iterations=1100)
     '''
     parameters = {'depth' : [6],
               'learning_rate' : [0.045,0.05],
@@ -180,6 +210,41 @@ def run_model(x_train, y, x_Test, seed):
     y_predictions = np.reshape(y_predictions, y_predictions.shape[0]) #for output
     return y_catboost_test, rounded, y_predictions, y_test, x_Test
 
+def run_model_submit(x_train, y, x_Test):
+    #Remove outliers : Isolation Forest
+    x_train, y = outliers_IF(x_train, y)
+    #x_train, y = outliers_IF(x_train, y)
+    #Feature Selection :
+    x_train, x_Test = s.RFE_selector(x_train, x_Test, y, 50)
+    #Split the dataset
+    #x_train, x_test, y_train, y_test = train_test_split(x_train, y, test_size=0.20, random_state=SEED)
+
+    catboost = CatBoostRegressor(random_seed=200, depth=6, learning_rate=0.05, iterations=1100)
+    '''
+    parameters = {'depth' : [6],
+              'learning_rate' : [0.045,0.05],
+              'iterations':[1000]
+              }
+
+    grid = GridSearchCV(estimator=catboost, param_grid = parameters, cv = 2, n_jobs=-1)
+    result = grid.fit(x_train.values, y_train.values)
+
+    # summarize result
+    print('Best Score: %s' % result.best_score_)
+    print('Best Hyperparameters: %s' % result.best_params_)
+    y_catboost_test = grid.predict(x_test.values)
+    y_predictions = grid.predict(x_Test.values) #for output
+
+    '''
+    catboost.fit(x_train.values, y.values)
+    #y_catboost_test = catboost.predict(x_test.values)
+    #rounded = np.floor(y_catboost_test) + np.full(np.shape(y_catboost_test), 0.5)
+    y_predictions = catboost.predict(x_Test.values) #for output
+    #y_predictions = np.floor(y_predictions) + np.full(np.shape(y_predictions), 0.5)
+    y_predictions = np.reshape(y_predictions, y_predictions.shape[0]) #for output
+    return  y_predictions
+
+
 if __name__ == '__main__':
 
     x_train_origin =  pd.read_csv("x_train.csv")
@@ -192,9 +257,10 @@ if __name__ == '__main__':
     y = y_train_origin['y']
 
     #Imputation missing values
+    print("Imputation missing values")
     x_train, x_Test = miss_val_with_knn(x_train, x_Test)
-
     #scale
+    print("scale")
     x_train, x_Test = scale(x_train, x_Test)
 
     # Set true if you want to test some seeds
@@ -207,6 +273,7 @@ if __name__ == '__main__':
         print("best seed = ", best_seed)
     else:
         catboost, rounded, y_predictions, y_test, x_Test = run_model(x_train, y, x_Test, SEED)
+        #y_predictions = run_model_submit(x_train, y, x_Test)
 
     print("Cat Boost",r2_score(y_test, catboost))
     print("with int values", r2_score(y_test, rounded))

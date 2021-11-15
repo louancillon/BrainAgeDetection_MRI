@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 #import seaborn as sns
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.neighbors import DistanceMetric
 from sklearn.ensemble import IsolationForest, VotingRegressor, AdaBoostRegressor
 from sklearn.model_selection import train_test_split, GridSearchCV
@@ -21,7 +22,8 @@ from sklearn.impute import KNNImputer
 from sklearn.experimental import enable_iterative_imputer  # noqa
 from sklearn.impute import IterativeImputer
 
-from fancyimpute import KNN, NuclearNormMinimization, SoftImpute, BiScaler
+from fancyimpute import KNN, NuclearNormMinimization, SoftImpute, BiScaler, IterativeImputer
+from sklearn.model_selection import GridSearchCV
 
 
 import feature_selection as s
@@ -54,11 +56,14 @@ def miss_val_with_knn(x_train,x_test):
     return x_train,x_test
 
 def miss_val_with_fancyinput(x_train,x_test):
-    impute_knn = KNN(k = 3)
-    x_train = pd.DataFrame(impute_knn.fit_transform(x_train),columns = x_train.columns)
-
-    impute_knn_test = KNN(k = 3)
-    x_test = pd.DataFrame(impute_knn_test.fit_transform(x_test),columns = x_test.columns)
+    print(x_train)
+    X_train_incomplete_normalized = x_train
+    impute_fancy = IterativeImputer()
+    x_train = pd.DataFrame(impute_fancy.fit_transform(X_train_incomplete_normalized.values),columns = x_train.columns)
+    
+    X_test_incomplete_normalized = x_test
+    impute_fancy_test = IterativeImputer()
+    x_test = pd.DataFrame(impute_fancy_test.fit_transform(X_test_incomplete_normalized.values),columns = x_test.columns)
     return x_train,x_test
 
 #Remove outliers
@@ -107,6 +112,13 @@ def outliers_KNN(data, ydata):
 
     return data, ydata
 
+def scale(x_train,x_test):
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(x_train)
+    X_test = scaler.fit_transform(x_test)
+
+    return pd.DataFrame(X_train, columns=x_train.columns), pd.DataFrame(X_test, columns = x_test.columns)
+
 def run_model_iter(x_train_start, y_start, x_Test_start, seed_start, seed_stop):
     score = 0
     best_catboost = None
@@ -144,11 +156,22 @@ def run_model(x_train, y, x_Test, seed):
     #Split the dataset
     x_train, x_test, y_train, y_test = train_test_split(x_train, y, test_size=0.20, random_state=SEED)
 
-    catboost = CatBoostRegressor(random_seed=SEED)
-    catboost.fit(x_train.values, y_train.values)
-    y_catboost_test = catboost.predict(x_test.values)
+    catboost = CatBoostRegressor(random_seed=200)
+    parameters = {'depth' : [6],
+              'learning_rate' : [0.045,0.05],
+              'iterations':[1000]
+              }
+
+    grid = GridSearchCV(estimator=catboost, param_grid = parameters, cv = 2, n_jobs=-1)
+    result = grid.fit(x_train.values, y_train.values)
+
+    # summarize result
+    print('Best Score: %s' % result.best_score_)
+    print('Best Hyperparameters: %s' % result.best_params_)
+
+    y_catboost_test = grid.predict(x_test.values)
     rounded = np.floor(y_catboost_test) + np.full(np.shape(y_catboost_test), 0.5)
-    y_predictions = catboost.predict(x_Test.values) #for output
+    y_predictions = grid.predict(x_Test.values) #for output
     #y_predictions = np.floor(y_predictions) + np.full(np.shape(y_predictions), 0.5)
     y_predictions = np.reshape(y_predictions, y_predictions.shape[0]) #for output
     return y_catboost_test, rounded, y_predictions, y_test, x_Test
@@ -166,6 +189,9 @@ if __name__ == '__main__':
 
     #Imputation missing values
     x_train, x_Test = miss_val_with_knn(x_train, x_Test)
+
+    #scale
+    x_train, x_Test = scale(x_train, x_Test)
 
     # Set true if you want to test some seeds
     iter = False

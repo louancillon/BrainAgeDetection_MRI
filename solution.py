@@ -219,7 +219,7 @@ def run_model_submit(x_train, y, x_Test):
     #Split the dataset
     #x_train, x_test, y_train, y_test = train_test_split(x_train, y, test_size=0.20, random_state=SEED)
 
-    catboost = CatBoostRegressor(random_seed=200, depth=6, learning_rate=0.05, iterations=1100)
+    catboost = CatBoostRegressor(random_seed=200, depth=6, learning_rate=0.05, iterations=2100)
     '''
     parameters = {'depth' : [6],
               'learning_rate' : [0.045,0.05],
@@ -272,11 +272,11 @@ if __name__ == '__main__':
             x_train, y, x_Test, 0, 11)
         print("best seed = ", best_seed)
     else:
-        catboost, rounded, y_predictions, y_test, x_Test = run_model(x_train, y, x_Test, SEED)
-        #y_predictions = run_model_submit(x_train, y, x_Test)
+        #catboost, rounded, y_predictions, y_test, x_Test = run_model(x_train, y, x_Test, SEED)
+        y_predictions = run_model_submit(x_train, y, x_Test)
 
-    print("Cat Boost",r2_score(y_test, catboost))
-    print("with int values", r2_score(y_test, rounded))
+    #print("Cat Boost",r2_score(y_test, catboost))
+    #print("with int values", r2_score(y_test, rounded))
 
     #Create submission file
     output = pd.DataFrame()

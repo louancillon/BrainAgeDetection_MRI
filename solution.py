@@ -28,7 +28,7 @@ from sklearn.model_selection import GridSearchCV
 
 import feature_selection as s
 
-SEED = 9
+SEED = 13
 
 
 #Filling missing values
@@ -83,8 +83,6 @@ def outliers_IF(x_train,y):
     print("Num lines after drop : ", y.shape)
 
     return x_train, y
-
- 
 
 
 def outliers_KNN(data, ydata):
@@ -151,12 +149,14 @@ def run_model(x_train, y, x_Test, seed):
     SEED = seed
     #Remove outliers : Isolation Forest
     x_train, y = outliers_IF(x_train, y)
+    #x_train, y = outliers_IF(x_train, y)
     #Feature Selection :
     x_train, x_Test = s.RFE_selector(x_train, x_Test, y, 50)
     #Split the dataset
     x_train, x_test, y_train, y_test = train_test_split(x_train, y, test_size=0.20, random_state=SEED)
 
-    catboost = CatBoostRegressor(random_seed=200)
+    catboost = CatBoostRegressor(random_seed=200, depth=6, learning_rate=0.05, iterations=1000)
+    '''
     parameters = {'depth' : [6],
               'learning_rate' : [0.045,0.05],
               'iterations':[1000]
@@ -168,10 +168,14 @@ def run_model(x_train, y, x_Test, seed):
     # summarize result
     print('Best Score: %s' % result.best_score_)
     print('Best Hyperparameters: %s' % result.best_params_)
-
     y_catboost_test = grid.predict(x_test.values)
-    rounded = np.floor(y_catboost_test) + np.full(np.shape(y_catboost_test), 0.5)
     y_predictions = grid.predict(x_Test.values) #for output
+
+    '''
+    catboost.fit(x_train.values, y_train.values)
+    y_catboost_test = catboost.predict(x_test.values)
+    rounded = np.floor(y_catboost_test) + np.full(np.shape(y_catboost_test), 0.5)
+    y_predictions = catboost.predict(x_Test.values) #for output
     #y_predictions = np.floor(y_predictions) + np.full(np.shape(y_predictions), 0.5)
     y_predictions = np.reshape(y_predictions, y_predictions.shape[0]) #for output
     return y_catboost_test, rounded, y_predictions, y_test, x_Test

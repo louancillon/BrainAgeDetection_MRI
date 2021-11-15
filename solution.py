@@ -219,7 +219,7 @@ def run_model_submit(x_train, y, x_Test):
     #Split the dataset
     #x_train, x_test, y_train, y_test = train_test_split(x_train, y, test_size=0.20, random_state=SEED)
 
-    catboost = CatBoostRegressor(random_seed=200, depth=6, learning_rate=0.05, iterations=2100)
+    catboost = CatBoostRegressor(random_seed=200, depth=6, learning_rate=0.05, iterations=9000)
     '''
     parameters = {'depth' : [6],
               'learning_rate' : [0.045,0.05],

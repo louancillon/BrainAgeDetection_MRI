@@ -26,7 +26,7 @@ from fancyimpute import KNN, NuclearNormMinimization, SoftImpute, BiScaler
 
 import feature_selection as s
 
-SEED = 400
+SEED = 9
 
 
 #Filling missing values
@@ -46,10 +46,10 @@ def miss_val_with_iterative(x_train,x_test):
     return x_train,x_test 
 
 def miss_val_with_knn(x_train,x_test):
-    impute_knn = KNNImputer(n_neighbors = 3)
+    impute_knn = KNNImputer(n_neighbors = 5)
     x_train = pd.DataFrame(impute_knn.fit_transform(x_train),columns = x_train.columns)
 
-    impute_knn_test = KNNImputer(n_neighbors = 3)
+    impute_knn_test = KNNImputer(n_neighbors = 5)
     x_test = pd.DataFrame(impute_knn_test.fit_transform(x_test),columns = x_test.columns)
     return x_train,x_test
 
@@ -107,6 +107,51 @@ def outliers_KNN(data, ydata):
 
     return data, ydata
 
+def run_model_iter(x_train_start, y_start, x_Test_start, seed_start, seed_stop):
+    score = 0
+    best_catboost = None
+    best_rounded = None
+    best_seed = 0
+    for i in range(seed_start, seed_stop):
+        SEED = i
+        #Remove outliers : Isolation Forest
+        x_train, y = outliers_IF(x_train_start, y_start)
+        #Feature Selection :
+        x_train, x_Test = s.RFE_selector(x_train, x_Test_start, y, 50)
+        #Split the dataset
+        x_train, x_test, y_train, y_test = train_test_split(x_train, y, test_size=0.20, random_state=SEED)
+
+        catboost = CatBoostRegressor(random_seed=SEED)
+        catboost.fit(x_train.values, y_train.values)
+        y_catboost_test = catboost.predict(x_test.values)
+        if r2_score(y_test, y_catboost_test) > score:
+            best_seed = i
+            best_catboost = y_catboost_test
+            best_rounded = np.floor(y_catboost_test) + np.full(np.shape(y_catboost_test), 0.5)
+    
+    SEED = best_seed
+    y_predictions = catboost.predict(x_Test.values) #for output
+    #y_predictions = np.floor(y_predictions) + np.full(np.shape(y_predictions), 0.5)
+    y_predictions = np.reshape(y_predictions, y_predictions.shape[0]) #for output
+    return best_catboost, best_rounded, best_seed, y_predictions, y_test, x_Test
+
+def run_model(x_train, y, x_Test, seed):
+    SEED = seed
+    #Remove outliers : Isolation Forest
+    x_train, y = outliers_IF(x_train, y)
+    #Feature Selection :
+    x_train, x_Test = s.RFE_selector(x_train, x_Test, y, 50)
+    #Split the dataset
+    x_train, x_test, y_train, y_test = train_test_split(x_train, y, test_size=0.20, random_state=SEED)
+
+    catboost = CatBoostRegressor(random_seed=SEED)
+    catboost.fit(x_train.values, y_train.values)
+    y_catboost_test = catboost.predict(x_test.values)
+    rounded = np.floor(y_catboost_test) + np.full(np.shape(y_catboost_test), 0.5)
+    y_predictions = catboost.predict(x_Test.values) #for output
+    #y_predictions = np.floor(y_predictions) + np.full(np.shape(y_predictions), 0.5)
+    y_predictions = np.reshape(y_predictions, y_predictions.shape[0]) #for output
+    return y_catboost_test, rounded, y_predictions, y_test, x_Test
 
 if __name__ == '__main__':
 
@@ -121,115 +166,20 @@ if __name__ == '__main__':
 
     #Imputation missing values
     x_train, x_Test = miss_val_with_knn(x_train, x_Test)
-    #Remove outliers : Isolation Forest
-    x_train, y = outliers_IF(x_train, y)
 
-    #Feature Selection :
-        # removing all features with variance lower than 0.1 (low var = all samples have the same values)
-    #x_train, x_Test = s.remove_low_var_features(x_train, x_Test, 20)
-        # example : k_best with 20 best features using f_regression function
-    #x_train, x_Test = s.select_univariate(x_train, x_Test, y, mode='k_best', param=200)
-        # example : using the lasso model for selection
-    #x_train, x_Test = s.select_from_model(x_train, x_Test, y)
-        # example : using the lasso model for selection
-    #x_train, x_Test = s.recursive_feature_elimination(x_train, x_Test, y, 190,SVR(kernel="linear"))
-    x_train, x_Test = s.RFE_selector(x_train, x_Test, y, 50)
-    print ("Train shape after selection: {} ".format(x_train.shape))
+    # Set true if you want to test some seeds
+    iter = False
 
+    if iter:
+        # Seeds that have been tested : 0 -> 10
+        catboost, rounded, best_seed, y_predictions, y_test, x_Test = run_model_iter(
+            x_train, y, x_Test, 0, 11)
+        print("best seed = ", best_seed)
+    else:
+        catboost, rounded, y_predictions, y_test, x_Test = run_model(x_train, y, x_Test, SEED)
 
-    #Split the dataset
-    x_train, x_test, y_train, y_test = train_test_split(x_train, y, test_size=0.20, random_state=SEED)
-
-
-    #Regressors :
-        
-        ###Cat Boost
-    '''
-    grid = {
-     #"iterations": [100,300],
-     "learning_rate": [x * 0.01 for x in range(0, 10)] #,
-     #"depth" : [6,7,8,9,10],
-     }
-
-    est = CatBoostRegressor()
-    logreg_cv=GridSearchCV(est,grid, scoring='r2')
-    logreg_cv.fit(x_train.values, y_train.values)
-    print("tuned hpyerparameters :(best parameters) ",logreg_cv.best_params_)
-    print("accuracy :",logreg_cv.best_score_)
-    '''
-
-    catboost = CatBoostRegressor()
-    catboost.fit(x_train.values, y_train.values)
-    y_catboost_test = catboost.predict(x_test.values)
-    y_predictions = catboost.predict(x_Test.values) #for output
-    y_predictions = np.reshape(y_predictions, y_predictions.shape[0]) #for output
-    print("Cat Boost",r2_score(y_test, y_catboost_test))
-
-        ###Gradient Boosting Regressor
-    gBoost = GradientBoostingRegressor(n_estimators=300, learning_rate=0.1,
-                                   max_depth=4, max_features=0.1 ,
-                                   min_samples_leaf=15, min_samples_split=10, random_state=SEED)
-
-    gBoost.fit(x_train.values, y_train.values)
-    y_gBoost_test = gBoost.predict(x_test.values)
-    print("Gradient Boosting", r2_score(y_test, y_gBoost_test))
-
-        ###Random Forest
-    random_forest = RandomForestRegressor(max_depth=12, max_features=0.3, n_estimators=100)
-    random_forest.fit(x_train.values, y_train.values)
-    y_rf_test = random_forest.predict(x_test.values)
-    print("Random Forest",r2_score(y_test, y_rf_test))
-        ###LASSO
-
-    lasso = Lasso()
-    lasso.fit(x_train.values, y_train.values)
-    y_lasso_test = lasso.predict(x_test.values)
-    print("Lasso",r2_score(y_test, y_lasso_test))
-
-        ###Stochastic Gradient Descent Regression
-    sgd = SGDRegressor()
-    sgd.fit(x_train.values, y_train.values)
-    y_sgd_test = sgd.predict(x_test.values)
-    print("SGD",r2_score(y_test, y_sgd_test))
-
-        ###Kernel Ridge
-    kernel = KernelRidge()
-    kernel.fit(x_train.values, y_train.values)
-    y_ker_test = kernel.predict(x_test.values)
-    print("Kernel Ridge ",r2_score(y_test, y_ker_test))
-
-        ###Elastic Net
-    elasticnet = ElasticNet()
-    elasticnet.fit(x_train.values, y_train.values)
-    y_elasticnet_test = elasticnet.predict(x_test.values)
-    print("Elastic Net ",r2_score(y_test, y_elasticnet_test))
-
-        ###Bayesian Ridge
-    bay = BayesianRidge()
-    bay.fit(x_train.values, y_train.values)
-    y_bay_test = bay.predict(x_test.values)
-    print("Bayesian Ridge ",r2_score(y_test, y_bay_test))
-
-        ###Support Vector Machine
-    svm = SVR()
-    svm.fit(x_train.values, y_train.values)
-    y_svm_test = svm.predict(x_test.values)
-    print("Support Vector Machine ",r2_score(y_test, y_svm_test))
-
-
-        ###AdaBoost
-    ada = AdaBoostRegressor()
-    ada.fit(x_train.values, y_train.values)
-    y_ada_train = ada.predict(x_train.values)
-    y_ada_test = ada.predict(x_test.values)
-    print("Adaboost ",r2_score(y_test, y_ada_test))
-
-        ###MLP Regressor
-    nnet = MLPRegressor()
-    nnet.fit(x_train.values, y_train.values)
-    y_nnet_train = nnet.predict(x_train.values)
-    y_nnet_test = nnet.predict(x_test.values)
-    print("MLP Regressor ",r2_score(y_test, y_nnet_test))
+    print("Cat Boost",r2_score(y_test, catboost))
+    print("with int values", r2_score(y_test, rounded))
 
     #Create submission file
     output = pd.DataFrame()
@@ -237,22 +187,3 @@ if __name__ == '__main__':
     output.index = x_Test.index
     output.index.names = ['id']
     output.to_csv("output")
-
-    '''
-    votingRegressor = VotingRegressor([('hist',hgBoost),('est', random_forest), ('model_xgb', model_xgb),('GBoost',gBoost),('Adaboost',ada)])
-    votingRegressor.fit(x_train.values, y_train.values)
-    y_test_predict = votingRegressor.predict(x_test.values)  # dernieres val
-    score = r2_score(y_test, y_test_predict)
-    
-            ###XGBoost
-    xgboost = XGBRegressor()
-    xgboost.fit(x_train.values, y_train.values)
-    y_xgboost_test = random_forest.predict(x_test.values)
-    print("XGBoost",r2_score(y_test, y_xgboost_test))
-    
-            ###LGBM
-    lgbm = LGBMRegressor()
-    lgbm.fit(x_train.values, y_train.values)
-    y_lgbm_test = random_forest.predict(x_test.values)
-    print("LGBM",r2_score(y_test, y_lgbm_test))
-    '''

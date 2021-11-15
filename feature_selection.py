@@ -7,6 +7,7 @@ from sklearn.svm import SVR
 from sklearn.linear_model import Lasso, Ridge, ElasticNet
 from sklearn.tree import DecisionTreeRegressor
 from catboost import CatBoostRegressor
+from solution import SEED
 
 # More details on https://scikit-learn.org/stable/modules/feature_selection.html
 
@@ -119,7 +120,7 @@ def recursive_feature_elimination(X_train, X_test, y, num_features, estimator):
 
 #Recursive Feature Elimination
 def RFE_selector(X_train,X_test,y,num_features):
-    estimator = GradientBoostingRegressor()
+    estimator = GradientBoostingRegressor(random_state=SEED)
     rfe_selector = RFE(estimator=estimator, n_features_to_select=num_features, step=0.1, verbose=1)
     x_train_rfe = rfe_selector.fit_transform(X_train, y)
     x_test_rfe = rfe_selector.transform(X_test)
